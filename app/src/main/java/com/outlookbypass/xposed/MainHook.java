@@ -1,6 +1,9 @@
 package com.outlookbypass.xposed;
 
 import android.content.Context;
+import android.webkit.WebView;
+
+import java.util.Map;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -28,6 +31,11 @@ public class MainHook implements IXposedHookLoadPackage {
 
     private static final String TAG = "OutlookPolicyBypass";
     private static final String TARGET_PACKAGE = "com.microsoft.office.outlook";
+
+    /** 伪装成桌面 Chrome，绕过按平台（Android/iOS）作用域的条件访问策略。 */
+    private static final String DESKTOP_CHROME_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     /** OLM 传统 MDM 策略类。 */
     private static final String OLM_DEVICE_POLICY =
@@ -64,6 +72,7 @@ public class MainHook implements IXposedHookLoadPackage {
         hookIntuneSdkEnrollment(cl);
         hookIntuneSdkCompliance(cl);
         hookOutlookEnrollment(cl);
+        hookWebViewUserAgent(cl);
     }
 
     // ------------------------------------------------------------------
@@ -207,6 +216,32 @@ public class MainHook implements IXposedHookLoadPackage {
             log("hooked MAMEnrollmentManagerImpl.getRegisteredAccountStatus -> ENROLLMENT_SUCCEEDED");
         } catch (Throwable t) {
             log("MAMEnrollmentManagerImpl.getRegisteredAccountStatus hook failed: " + t);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 4) 登录 WebView UA 伪装（服务端条件访问按 UA 判定平台时有效）
+    // ------------------------------------------------------------------
+
+    private void hookWebViewUserAgent(ClassLoader cl) {
+        try {
+            Class<?> webView = XposedHelpers.findClass("android.webkit.WebView", cl);
+            XC_MethodHook setDesktopUa = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    try {
+                        WebView wv = (WebView) param.thisObject;
+                        wv.getSettings().setUserAgentString(DESKTOP_CHROME_UA);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            };
+            XposedHelpers.findAndHookMethod(webView, "loadUrl", String.class, setDesktopUa);
+            XposedHelpers.findAndHookMethod(webView, "loadUrl", String.class, Map.class, setDesktopUa);
+            XposedHelpers.findAndHookMethod(webView, "postUrl", String.class, byte[].class, setDesktopUa);
+            log("hooked WebView loadUrl/postUrl -> desktop Chrome UA");
+        } catch (Throwable t) {
+            log("WebView UA hook failed: " + t);
         }
     }
 

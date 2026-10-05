@@ -25,6 +25,7 @@
 | Intune MAM | `MAMEnrollmentManagerImpl.getRegisteredAccountStatus(...)` | 固定返回 `ENROLLMENT_SUCCEEDED` |
 | Intune MAM | `OfflineMAMEnrollmentManager.remediateCompliance(...)` | 跳过（不弹“安装公司门户”） |
 | Intune MAM | `OfflineMAMEnrollmentManager.showNonBlockingInstallSSPUI(...)` | 跳过（不弹“安装公司门户”） |
+| 登录 WebView | `WebView.loadUrl/postUrl` 前设置 UA | 伪装为桌面 Chrome（绕过按平台作用域的条件访问） |
 
 > 无界面、无额外功耗，只在 Outlook 进程内生效。
 
