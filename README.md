@@ -23,6 +23,8 @@
 | Intune MAM | `MAMWEAccountManager.getAccountStatus(...)` | 固定返回 `ENROLLMENT_SUCCEEDED` |
 | Intune MAM | `MAMWEAccountManager.isCompanyPortalRequired(...)` | 固定返回 `false` |
 | Intune MAM | `MAMEnrollmentManagerImpl.getRegisteredAccountStatus(...)` | 固定返回 `ENROLLMENT_SUCCEEDED` |
+| Intune MAM | `OfflineMAMEnrollmentManager.remediateCompliance(...)` | 跳过（不弹“安装公司门户”） |
+| Intune MAM | `OfflineMAMEnrollmentManager.showNonBlockingInstallSSPUI(...)` | 跳过（不弹“安装公司门户”） |
 
 > 无界面、无额外功耗，只在 Outlook 进程内生效。
 

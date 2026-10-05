@@ -36,6 +36,8 @@ public class MainHook implements IXposedHookLoadPackage {
     /** Intune MAM SDK：注册状态管理。 */
     private static final String SDK_WE_ACCOUNT_MANAGER =
             "com.microsoft.intune.mam.policy.MAMWEAccountManager";
+    private static final String SDK_OFFLINE_ENROLLMENT_MANAGER =
+            "com.microsoft.intune.mam.client.app.offline.OfflineMAMEnrollmentManager";
     private static final String SDK_MAM_IDENTITY =
             "com.microsoft.intune.mam.client.identity.MAMIdentity";
     private static final String SDK_LOG_PII_FACTORY =
@@ -60,6 +62,7 @@ public class MainHook implements IXposedHookLoadPackage {
 
         hookOlmDevicePolicy(cl);
         hookIntuneSdkEnrollment(cl);
+        hookIntuneSdkCompliance(cl);
         hookOutlookEnrollment(cl);
     }
 
@@ -133,6 +136,54 @@ public class MainHook implements IXposedHookLoadPackage {
             log("hooked MAMWEAccountManager.isCompanyPortalRequired(Context,..) -> false");
         } catch (Throwable t) {
             log("MAMWEAccountManager.isCompanyPortalRequired(Context,..) hook failed: " + t);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2b) Intune MAM SDK：拦截“安装公司门户 / 重新注册”UI 链路
+    //     remediateCompliance -> handleCompanyPortalRequirement
+    //     -> showNonBlockingInstallSSPUI -> OfflineInstallCompanyPortalDialogActivity
+    // ------------------------------------------------------------------
+
+    private void hookIntuneSdkCompliance(ClassLoader cl) {
+        Class<?> em;
+        try {
+            em = XposedHelpers.findClass(SDK_OFFLINE_ENROLLMENT_MANAGER, cl);
+        } catch (Throwable t) {
+            log("OfflineMAMEnrollmentManager class not found: " + t);
+            return;
+        }
+
+        // remediateCompliance(String,String,String,String,boolean) -> 直接跳过
+        // （该方法会起线程去弹“安装公司门户”对话框）
+        try {
+            XposedHelpers.findAndHookMethod(em, "remediateCompliance",
+                    String.class, String.class, String.class, String.class, boolean.class,
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) {
+                            param.setResult(null);
+                        }
+                    });
+            log("hooked OfflineMAMEnrollmentManager.remediateCompliance -> no-op");
+        } catch (Throwable t) {
+            log("remediateCompliance hook failed: " + t);
+        }
+
+        // showNonBlockingInstallSSPUI(MAMIdentity, Context) -> 直接跳过
+        // （该方法 startActivity 拉起 OfflineInstallCompanyPortalDialogActivity）
+        try {
+            Class<?> identity = XposedHelpers.findClass(SDK_MAM_IDENTITY, cl);
+            XposedHelpers.findAndHookMethod(em, "showNonBlockingInstallSSPUI",
+                    identity, Context.class, new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    param.setResult(null);
+                }
+            });
+            log("hooked OfflineMAMEnrollmentManager.showNonBlockingInstallSSPUI -> no-op");
+        } catch (Throwable t) {
+            log("showNonBlockingInstallSSPUI hook failed: " + t);
         }
     }
 
