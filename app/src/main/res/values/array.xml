@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 只需要注入 Outlook 进程即可 -->
+    <string-array name="xposed_scope">
+        <item>com.microsoft.office.outlook</item>
+    </string-array>
+</resources>

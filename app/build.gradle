@@ -1,0 +1,43 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+
+    signingConfigs {
+        release {
+            storeFile file('../keystore/outlookbypass.jks')
+            storePassword 'outlookbypass'
+            keyAlias 'outlookbypass'
+            keyPassword 'outlookbypass'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+
+    namespace 'com.outlookbypass.xposed'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.outlookbypass.xposed"
+        minSdk 26
+        targetSdk 35
+        versionCode 3
+        versionName "1.2.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    compileOnly 'de.robv.android.xposed:api:82'
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Outlook Device Policy Bypass</string>
+    <string name="xposed_desc">绕过 Microsoft Outlook 企业账号的设备管理（MDM / Intune）策略要求，跳过设备注册与策略应用。</string>
+</resources>
