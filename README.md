@@ -10,15 +10,19 @@
 
 ## ✨ 功能
 
-微软 Outlook（`com.microsoft.office.outlook`）在登录企业账号时，会根据 `DevicePolicy` 判断设备是否满足
-MDM / Intune 要求。不满足时，Outlook 会强制要求注册设备管理、应用设备策略，否则无法继续使用。
+微软 Outlook（`com.microsoft.office.outlook`）在登录企业账号时，会根据 `DevicePolicy` 以及 Intune MAM SDK
+判断设备是否满足 MDM / Intune 要求。不满足时，Outlook 会强制要求注册设备管理、应用设备策略，或提示
+“使用管理应用重新注册设备”，否则无法继续使用。
 
-本模块在 Outlook 进程内 Hook `DevicePolicy` 的两个判定方法，绕过设备策略限制：
+本模块在 Outlook 进程内 Hook 两套设备管理链路的判定方法：
 
-| 方法 | 原行为 | Hook 后 |
-| ---- | ------ | ------- |
-| `DevicePolicy.requiresDeviceManagement()` | 密码策略要求时为 `true` | 固定返回 `false` |
-| `DevicePolicy.isPolicyApplied()` | 策略是否已应用 | 固定返回 `true` |
+| 链路 | 方法 | Hook 后 |
+| ---- | ---- | ------- |
+| OLM 传统 MDM | `DevicePolicy.requiresDeviceManagement()` | 固定返回 `false` |
+| OLM 传统 MDM | `DevicePolicy.isPolicyApplied()` | 固定返回 `true` |
+| Intune MAM | `MAMWEAccountManager.getAccountStatus(...)` | 固定返回 `ENROLLMENT_SUCCEEDED` |
+| Intune MAM | `MAMWEAccountManager.isCompanyPortalRequired(...)` | 固定返回 `false` |
+| Intune MAM | `MAMEnrollmentManagerImpl.getRegisteredAccountStatus(...)` | 固定返回 `ENROLLMENT_SUCCEEDED` |
 
 > 无界面、无额外功耗，只在 Outlook 进程内生效。
 
@@ -29,29 +33,33 @@ MDM / Intune 要求。不满足时，Outlook 会强制要求注册设备管理�
 ```
 com.microsoft.office.outlook
       │
-      ▼
-com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy
-      ├── requiresDeviceManagement()  -> false  （不需要设备管理）
-      └── isPolicyApplied()           -> true   （策略已应用，账号合规）
+      ├──▶ OLM 传统 MDM（旧链路）
+      │      com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy
+      │        ├── requiresDeviceManagement()  -> false  （不需要设备管理）
+      │        └── isPolicyApplied()           -> true   （策略已应用，账号合规）
+      │
+      └──▶ Intune MAM（公司门户 / Company Portal 链路）
+             com.microsoft.intune.mam.policy.MAMWEAccountManager
+               ├── getAccountStatus(...)             -> ENROLLMENT_SUCCEEDED
+               └── isCompanyPortalRequired(...)      -> false
+             com.microsoft.office.outlook.intune.impl.policy.MAMEnrollmentManagerImpl
+               └── getRegisteredAccountStatus(...)   -> ENROLLMENT_SUCCEEDED
 ```
 
-这两个方法在 Outlook 中被以下流程调用：
-
-- `OlmDeviceEnrollmentManager.isDeviceManagementRequired()`
-- `OlmDeviceEnrollmentManager.getRestrictedAccounts()`
-- `OlmDeviceEnrollmentManager.updateAccountPolicyAndCheckIfStillCompliant()`
-- `OlmDeviceEnrollmentManager.markAllAccountsAsInCompliance()`
-- `AuthFragment.finishLoginWithResult()`
+“使用管理应用重新注册设备” 来自第二条链路：设备曾注册过 Intune，但注册状态过期后
+Outlook 拿到 `MAMEnrollmentManager$Result.COMPANY_PORTAL_REQUIRED` 并阻断登录。
+Hook 后固定返回 `ENROLLMENT_SUCCEEDED` / `false`，即可绕过。
 
 ## 📦 适配说明（本机）
 
 已针对本机 Outlook **5.2638.1**（`versionCode 72638120`）验证：
 
-- 类 `com.microsoft.office.outlook.olmcore.managers.mdm.DevicePolicy` ✅ 存在
-- `requiresDeviceManagement()Z` ✅ 存在，返回 `mIsPasswordRequired` 字段
-- `isPolicyApplied()Z` ✅ 存在，返回 `mIsPolicyApplied` 字段
-
-因此原模块的 Hook 目标在 5.2638.1 中仍然有效，无需改动类名 / 方法名。
+| 类 | 方法 | 状态 |
+| -- | -- | -- |
+| `...olmcore.managers.mdm.DevicePolicy` | `requiresDeviceManagement()Z` / `isPolicyApplied()Z` | ✅ 存在 |
+| `com.microsoft.intune.mam.policy.MAMWEAccountManager` | `getAccountStatus(MAMIdentity)` | ✅ 存在 |
+| `com.microsoft.intune.mam.policy.MAMWEAccountManager` | `isCompanyPortalRequired()` / `isCompanyPortalRequired(Context, MAMLogPIIFactory)` | ✅ 存在 |
+| `...intune.impl.policy.MAMEnrollmentManagerImpl` | `getRegisteredAccountStatus(String, String)` | ✅ 存在 |
 
 ## 🚀 使用
 
